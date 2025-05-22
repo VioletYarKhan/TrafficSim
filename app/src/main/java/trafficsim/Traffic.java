@@ -1,0 +1,124 @@
+package trafficsim;
+
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
+
+public class Traffic {
+    private DecimalFormat df = new DecimalFormat("0.00");
+    public int lanes;
+    public Car[] cars;
+    public double dt;
+    public double simTime;
+
+    private Traffic(int lanes, int carCount, double dt) {
+        this.lanes = lanes;
+        this.cars = new Car[carCount];
+        this.dt = dt;
+        initializeCars(carCount);
+    }
+
+    private void initializeCars(int carCount) {
+        Map<Integer, Double> laneLastPosition = new HashMap<>();
+
+        for (int i = 0; i < carCount; i++) {
+            int lane = (int) (Math.random() * lanes + 1);
+            double maxSpeedMPH = 45 + Math.random() * 25;
+            double maxAccel = 6.7 + Math.random() * 2.2;
+            double desiredDistance = 5 + Math.random() * 30;
+            double kP = Math.random() / 2.0 + 0.3;
+            double kD = Math.random() / 20.0;
+
+            double position = laneLastPosition.getOrDefault(lane, 0.0) + Constants.carLengthFt/2;
+            position += desiredDistance + 30 + Math.random() * 20;
+
+            Car car = new Car(lane, maxSpeedMPH, maxAccel, desiredDistance, kP, kD);
+            car.setDistanceFromStart(position);
+
+            cars[i] = car;
+            laneLastPosition.put(lane, position);
+        }
+    }
+
+    public static Traffic startSim(int lanes, int cars, double dt, double simTime) {
+        Traffic t = new Traffic(lanes, cars, dt);
+        t.runSim(simTime);
+        return t;
+    }
+
+    private void runSim(double totalSeconds) {
+        int steps = (int) (totalSeconds / dt);
+        for (int step = 0; step <= steps; step++) {
+            double currentTime = step * dt;
+
+            for (int laneNum = 1; laneNum <= lanes; laneNum++) {
+                ArrayList<Car> laneCars = new ArrayList<>();
+                for (Car c : cars) {
+                    if (c.getLane() == laneNum) laneCars.add(c);
+                }
+                laneCars.sort(Comparator.comparingDouble(Car::getDistanceFromStart).reversed());
+
+                for (int i = 0; i < laneCars.size(); i++) {
+                    Car current = laneCars.get(i);
+                    Car ahead = (i > 0) ? laneCars.get(i - 1) : null;
+                    current.update(dt, ahead, cars);
+                }
+            }
+
+            System.out.print("\033[H");
+            System.out.println("Time: " + df.format(currentTime));
+            printVisualization();
+            try {
+                Thread.sleep(10); // optional: slow down output
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    public double getAverageSpeed(){
+        double sum = 0;
+        for (Car c : cars){
+            sum += c.getSpeed();
+        }
+        return sum/cars.length;
+    }
+
+    public double getAverageDistance(){
+        double sum = 0;
+        for (Car c : cars){
+            sum += c.getDistanceFromStart();
+        }
+        return sum/cars.length;
+    }
+
+
+    private void printVisualization() {
+        final int screenWidth = 92; // characters wide
+        final double worldWidth = 3000; // feet represented across screen
+        char[][] screen = new char[lanes][screenWidth];
+
+        // Initialize screen with spaces
+        for (int i = 0; i < lanes; i++) {
+            for (int j = 0; j < screenWidth; j++) {
+                screen[i][j] = ' ';
+            }
+        }
+
+        for (Car car : cars) {
+            int laneIndex = car.getLane() - 1;
+            int pos = (int) ((car.getDistanceFromStart() / worldWidth) * screenWidth);
+            pos = Math.min(screenWidth - 1, Math.max(0, pos));
+            screen[laneIndex][pos] = '>';
+        }
+
+        // Print the screen
+        for (int i = 0; i < lanes; i++) {
+            System.out.print("Lane " + (i + 1) + ": ");
+            System.out.println(new String(screen[i]));
+        }
+        System.out.println();
+    }
+}
