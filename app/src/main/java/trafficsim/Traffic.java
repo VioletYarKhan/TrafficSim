@@ -2,8 +2,10 @@ package trafficsim;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Traffic {
@@ -25,8 +27,8 @@ public class Traffic {
 
         for (int i = 0; i < carCount; i++) {
             int lane = (int) (Math.random() * lanes + 1);
-            double maxSpeedMPH = 45 + Math.random() * 25;
-            double maxAccel = 6.7 + Math.random() * 2.2;
+            double maxSpeedMPH = (40 + Math.random() * 40);
+            double maxAccel = 6.7 + Math.random() * 3.5;
             double desiredDistance = 5 + Math.random() * 30;
             double kP = Math.random() / 2.0 + 0.3;
             double kD = Math.random() / 20.0;
@@ -71,7 +73,7 @@ public class Traffic {
             System.out.println("Time: " + df.format(currentTime));
             printVisualization();
             try {
-                Thread.sleep(10); // optional: slow down output
+                Thread.sleep(1);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -94,16 +96,29 @@ public class Traffic {
         return sum/cars.length;
     }
 
+    public double getMaxDistance(){
+        Comparator<Car> dist = Comparator.comparingDouble(Car::getDistanceFromStart);
+        List<Car> carList = List.of(cars);
+        return Collections.max(carList, dist).getDistanceFromStart();
+    }
+
+    public int[] carsPerLane(){
+        int[] lanes = new int[Constants.lanes];
+        for (Car c : cars) {
+            lanes[c.getLane() - 1] ++;
+        }
+        return lanes;
+    }
+
 
     private void printVisualization() {
         final int screenWidth = 92; // characters wide
-        final double worldWidth = 3000; // feet represented across screen
-        char[][] screen = new char[lanes][screenWidth];
+        final double worldWidth = 15000; // feet represented across screen
+        String[][] screen = new String[lanes][screenWidth];
 
-        // Initialize screen with spaces
         for (int i = 0; i < lanes; i++) {
             for (int j = 0; j < screenWidth; j++) {
-                screen[i][j] = ' ';
+                screen[i][j] = " ";
             }
         }
 
@@ -111,14 +126,33 @@ public class Traffic {
             int laneIndex = car.getLane() - 1;
             int pos = (int) ((car.getDistanceFromStart() / worldWidth) * screenWidth);
             pos = Math.min(screenWidth - 1, Math.max(0, pos));
-            screen[laneIndex][pos] = '>';
+            screen[laneIndex][pos] = colorSymbolFor(car);
         }
 
-        // Print the screen
+        int endCol = (int) ((Constants.rightLaneEnd / worldWidth) * screenWidth);
+        if (endCol >= 0 && endCol < screenWidth) {
+            screen[lanes - 1][endCol] = "|"; // show barrier on bottom-most lane
+        }
+
         for (int i = 0; i < lanes; i++) {
             System.out.print("Lane " + (i + 1) + ": ");
-            System.out.println(new String(screen[i]));
+            System.out.println(String.join("", screen[i]));
         }
         System.out.println();
+    }
+
+    /*
+    private String colorSymbolFor(Car car) {
+        if (car.getMaxSpeed() < 45) return "\u001B[31m>\u001B[0m";
+        if (car.getMaxSpeed() > 75) return "\u001B[32m>\u001B[0m";
+        return ">";
+    }
+    */
+
+    private String colorSymbolFor(Car car) {
+        double speed = car.getSpeed(); // current speed
+        if (speed < 45) return "\u001B[31m>\u001B[0m"; // red for slow
+        if (speed < 65) return "\u001B[33m>\u001B[0m"; // yellow for medium
+        return "\u001B[32m>\u001B[0m"; // green for fast
     }
 }

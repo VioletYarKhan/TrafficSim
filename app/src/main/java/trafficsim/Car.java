@@ -11,7 +11,7 @@
         private double kD;
         private double lengthFt;
 
-        public static final double SAFE_LANE_CHANGE_GAP = 10.0; 
+        public static final double laneChangeGap = 10.0; 
 
         public Car(int lane, double maxSpeedMPH, double maxAccelMPHSquared, double desiredDistanceFromCarAhead, double kP, double kD) {
             this.lane = lane;
@@ -41,19 +41,25 @@
             return currentSpeedMPH;
         }
 
+        public double getMaxSpeed(){
+            return maxSpeedMPH;
+        }
+
         public void setDistanceFromStart(double distance) {
             this.distanceFromStart = distance;
         }
 
         public void tryLaneChange(Car[] cars) {
             Car frontCar = findFrontCar(cars, lane);
-            if (frontCar == null || frontCar.getDistanceFromStart() - this.distanceFromStart > desiredDistanceFromCarAhead * 1.5) {
+            if ((frontCar == null || frontCar.getDistanceFromStart() - this.distanceFromStart > desiredDistanceFromCarAhead * 2.5) && !(Constants.rightLaneEnd - getDistanceFromStart() < 600 && Constants.rightLaneEnd > 0 && this.lane == Constants.lanes)) {
                 return; // No need to change lane, enough space ahead
             }
 
             for (int dir = -1; dir <= 1; dir += 2) { // Check left (-1) and right (+1)
+                boolean requiredChange = false;
                 int newLane = lane + dir;
-                if (newLane < 1 || newLane > Constants.lanes){
+                boolean rightLaneAvailable = Constants.rightLaneEnd < 0 || getDistanceFromStart() < Constants.rightLaneEnd;
+                if (newLane < 1 || newLane > (rightLaneAvailable ? Constants.lanes : Constants.lanes - 1)) {
                     continue;
                 }
 
@@ -63,6 +69,7 @@
                 boolean laneClear = true;
                 double minGapBehind = desiredDistanceFromCarAhead/2;
                 double minGapAhead = desiredDistanceFromCarAhead/2;
+
 
                 for (Car other : cars) {
                     if (other == this || other.lane != newLane){
@@ -87,6 +94,9 @@
                         }
                     }
                 }
+                if (Constants.rightLaneEnd - getDistanceFromStart() < 600 && Constants.rightLaneEnd > 0 && newLane == Constants.lanes){
+                    laneClear = false;
+                }
 
                 boolean wouldBeFaster = false;
                 if (laneClear) {
@@ -102,11 +112,16 @@
                         double speedNew = frontInNewLane.getSpeed();
 
                         // Prefer lane if more space or if front car is faster
-                        wouldBeFaster = (gapNew > gapCurrent + 5) || (speedNew > speedCurrent + 2);
+                        wouldBeFaster = (gapNew > gapCurrent) || (speedNew > speedCurrent);
                     }
                 }
 
-                if (laneClear && wouldBeFaster) {
+                if (this.lane == Constants.lanes && Constants.rightLaneEnd > 0 &&
+                    this.distanceFromStart > Constants.rightLaneEnd - 500) {
+                    requiredChange = true;
+                }
+
+                if (laneClear && (wouldBeFaster || requiredChange)) {
                     // System.out.println("Lane Change! " + lane + " to " + newLane);
                     this.lane = newLane;
                     break;
@@ -136,6 +151,39 @@
                 targetSpeed = Math.min(maxSpeedMPH, Math.max(0, targetSpeed));
             }
 
+            if (this.lane == Constants.lanes) {
+                double distanceToEnd = Constants.rightLaneEnd - (this.distanceFromStart + this.getLength() / 2);
+                
+                if (distanceToEnd < 700 && Constants.rightLaneEnd > 0) {
+                    boolean canChange = false;
+                    int newLane = this.lane - 1;
+
+                    for (Car other : allCars) {
+                        if (other != this && other.lane == newLane) {
+                            double dist = Math.abs(other.getDistanceFromStart() - this.distanceFromStart);
+                            if (dist < this.desiredDistanceFromCarAhead) {
+                                currentSpeedMPH /= 2;
+                                targetSpeed /= 2;
+                                canChange = false;
+                                break;
+                            }
+                            canChange = true;
+                        }
+                    }
+
+                    if (!canChange) {
+                        // Slow down to avoid driving off the road
+                        targetSpeed = Math.min(targetSpeed, (distanceToEnd / 10)); // braking logic
+                    }
+                }
+
+                // Actually stop if we hit the end and couldn't merge
+                if (distanceToEnd <= 30 && Constants.rightLaneEnd > 0) {
+                    targetSpeed = 0;
+                    currentSpeedMPH /= 2;
+                }
+            }
+
             // Apply acceleration limits
             double speedDiff = targetSpeed - currentSpeedMPH;
             double maxDelta = maxAccelMPHSquared * dt;
@@ -149,7 +197,26 @@
             // Update position based on new speed
             double feetPerHour = currentSpeedMPH * 5280;
             double feetPerSecond = feetPerHour / 3600;
-            distanceFromStart += feetPerSecond * dt;
+            double movementFeet = feetPerSecond * dt;
+
+            double proposedFront = distanceFromStart + movementFeet + (getLength() / 2);
+            double proposedBack = distanceFromStart + movementFeet - (getLength() / 2);
+
+            for (Car other : allCars) {
+                if (other == this || other.lane != this.lane) continue;
+
+                double otherFront = other.getDistanceFromStart() + (other.getLength() / 2);
+                double otherBack = other.getDistanceFromStart() - (other.getLength() / 2);
+
+                boolean overlaps = !(proposedBack >= otherFront || proposedFront <= otherBack);
+                if (overlaps) {
+                    // Collision would happen, cancel movement
+                    movementFeet = Math.max(0, otherBack - (this.getLength() / 2) - distanceFromStart - 1);
+                    currentSpeedMPH = Math.max(0, currentSpeedMPH - 10 * dt);
+                    break;
+                }
+            }
+            distanceFromStart += movementFeet;
         }
 
         private Car findFrontCar(Car[] cars, int laneToCheck) {
