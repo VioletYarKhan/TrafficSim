@@ -16,19 +16,21 @@ public class Traffic {
     public double simTime;
     public boolean visualize;
 
-    private Traffic(int lanes, int carCount, double dt, boolean visualize) {
+    private Traffic(int lanes, int carCount, double dt, boolean visualize, double simTime) {
         this.lanes = lanes;
         this.cars = new Car[carCount];
         this.dt = dt;
         this.visualize = visualize;
+        this.simTime = simTime;
         initializeCars(carCount);
     }
 
-    private Traffic(int lanes, List<Car> carInput, double dt, boolean visualize) {
+    private Traffic(int lanes, List<Car> carInput, double dt, boolean visualize, double simTime) {
         this.lanes = lanes;
         this.cars = new Car[carInput.size()];
         this.dt = dt;
         this.visualize = visualize;
+        this.simTime = simTime;
         initializeCars(carInput);
     }
 
@@ -63,10 +65,13 @@ public class Traffic {
             int lane = (int) (Math.random() * lanes + 1);
             car.setLane(lane);
 
-            double position = laneLastPosition.getOrDefault(lane, 0.0) + Constants.carLengthFt/2;
-            position += car.getDesiredDistance() + 30 + Math.random() * 20;
+            double position = car.getDistanceFromStart();
 
-            car.setDistanceFromStart(position);
+            if (position == 0) {
+                position = laneLastPosition.getOrDefault(lane, 0.0) + Constants.carLengthFt / 2;
+                position += car.getDesiredDistance() + 30 + Math.random() * 20;
+                car.setDistanceFromStart(position);
+            }
 
             cars[i] = car;
             laneLastPosition.put(lane, position);
@@ -74,16 +79,20 @@ public class Traffic {
         }
     }
 
-    public static Traffic startSim(int lanes, int cars, double dt, double simTime, boolean visualize) {
-        Traffic t = new Traffic(lanes, cars, dt, visualize);
-        t.runSim(simTime);
+    public static Traffic createSim(int lanes, int cars, double dt, double simTime, boolean visualize) {
+        Traffic t = new Traffic(lanes, cars, dt, visualize, simTime);
+        
         return t;
     }
 
-    public static Traffic startSim(int lanes, List<Car> cars, double dt, double simTime, boolean visualize) {
-        Traffic t = new Traffic(lanes, cars, dt, visualize);
-        t.runSim(simTime);
+    public static Traffic createSim(int lanes, List<Car> cars, double dt, double simTime, boolean visualize) {
+        Traffic t = new Traffic(lanes, cars, dt, visualize, simTime);
         return t;
+    }
+
+    public Traffic startSim(){
+        this.runSim(simTime);
+        return this;
     }
 
     private void runSim(double totalSeconds) {
@@ -145,7 +154,7 @@ public class Traffic {
     }
 
     public int[] carsPerLane(){
-        int[] lanes = new int[Constants.lanes];
+        int[] lanes = new int[this.getNumLanes()];
         for (Car c : cars) {
             lanes[c.getLane() - 1] ++;
         }

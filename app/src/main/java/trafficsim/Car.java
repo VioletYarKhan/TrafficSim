@@ -38,6 +38,10 @@
             this.lane = lane;
         }
 
+        public void setSpeed(double speed){
+            this.currentSpeedMPH = speed;
+        }
+
         public double getDistanceFromStart() {
             return distanceFromStart;
         }
@@ -74,8 +78,6 @@
                 boolean rightLaneAvailable = Constants.rightLaneEnd < 0 || getDistanceFromStart() < Constants.rightLaneEnd;
                 if (newLane < 1 || newLane > (rightLaneAvailable ? t.getNumLanes() : t.getNumLanes() - 1)) {
                     continue;
-                } else{
-                    new String("new lane detected");
                 }
 
                 Car frontInNewLane = findFrontCar(cars, newLane);
