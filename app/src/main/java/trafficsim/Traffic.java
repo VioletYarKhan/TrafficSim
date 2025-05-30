@@ -14,12 +14,22 @@ public class Traffic {
     public Car[] cars;
     public double dt;
     public double simTime;
+    public boolean visualize;
 
-    private Traffic(int lanes, int carCount, double dt) {
+    private Traffic(int lanes, int carCount, double dt, boolean visualize) {
         this.lanes = lanes;
         this.cars = new Car[carCount];
         this.dt = dt;
+        this.visualize = visualize;
         initializeCars(carCount);
+    }
+
+    private Traffic(int lanes, List<Car> carInput, double dt, boolean visualize) {
+        this.lanes = lanes;
+        this.cars = new Car[carInput.size()];
+        this.dt = dt;
+        this.visualize = visualize;
+        initializeCars(carInput);
     }
 
     private void initializeCars(int carCount) {
@@ -37,6 +47,7 @@ public class Traffic {
             position += desiredDistance + 30 + Math.random() * 20;
 
             Car car = new Car(lane, maxSpeedMPH, maxAccel, desiredDistance, kP, kD);
+            car.assignTraffic(this);
             car.setDistanceFromStart(position);
 
             cars[i] = car;
@@ -44,8 +55,33 @@ public class Traffic {
         }
     }
 
-    public static Traffic startSim(int lanes, int cars, double dt, double simTime) {
-        Traffic t = new Traffic(lanes, cars, dt);
+    private void initializeCars(List<Car> carInput) {
+        Map<Integer, Double> laneLastPosition = new HashMap<>();
+        int i = 0;
+        for (Car car : carInput) {
+            car.assignTraffic(this);
+            int lane = (int) (Math.random() * lanes + 1);
+            car.setLane(lane);
+
+            double position = laneLastPosition.getOrDefault(lane, 0.0) + Constants.carLengthFt/2;
+            position += car.getDesiredDistance() + 30 + Math.random() * 20;
+
+            car.setDistanceFromStart(position);
+
+            cars[i] = car;
+            laneLastPosition.put(lane, position);
+            i++;
+        }
+    }
+
+    public static Traffic startSim(int lanes, int cars, double dt, double simTime, boolean visualize) {
+        Traffic t = new Traffic(lanes, cars, dt, visualize);
+        t.runSim(simTime);
+        return t;
+    }
+
+    public static Traffic startSim(int lanes, List<Car> cars, double dt, double simTime, boolean visualize) {
+        Traffic t = new Traffic(lanes, cars, dt, visualize);
         t.runSim(simTime);
         return t;
     }
@@ -69,13 +105,15 @@ public class Traffic {
                 }
             }
 
-            System.out.print("\033[H");
-            System.out.println("Time: " + df.format(currentTime));
-            printVisualization();
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            if (visualize){
+                System.out.print("\033[H");
+                System.out.println("Time: " + df.format(currentTime));
+                printVisualization();
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
             }
         }
     }
@@ -96,6 +134,10 @@ public class Traffic {
         return sum/cars.length;
     }
 
+    public int getNumLanes(){
+        return lanes;
+    }
+
     public double getMaxDistance(){
         Comparator<Car> dist = Comparator.comparingDouble(Car::getDistanceFromStart);
         List<Car> carList = List.of(cars);
@@ -108,6 +150,10 @@ public class Traffic {
             lanes[c.getLane() - 1] ++;
         }
         return lanes;
+    }
+
+    public double getIndexCarDist(int index){
+        return cars[index].getDistanceFromStart();
     }
 
 

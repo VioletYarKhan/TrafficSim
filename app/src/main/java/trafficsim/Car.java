@@ -10,6 +10,7 @@
         private double kP;
         private double kD;
         private double lengthFt;
+        private Traffic t;
 
         public static final double laneChangeGap = 10.0; 
 
@@ -25,12 +26,24 @@
             this.lengthFt = Constants.carLengthFt;
         }
 
+        public void assignTraffic(Traffic t){
+            this.t = t;
+        }
+
         public int getLane() {
             return lane;
         }
 
+        public void setLane(int lane){
+            this.lane = lane;
+        }
+
         public double getDistanceFromStart() {
             return distanceFromStart;
+        }
+
+        public double getDesiredDistance(){
+            return desiredDistanceFromCarAhead;
         }
 
         public double getLength() {
@@ -51,7 +64,7 @@
 
         public void tryLaneChange(Car[] cars) {
             Car frontCar = findFrontCar(cars, lane);
-            if ((frontCar == null || frontCar.getDistanceFromStart() - this.distanceFromStart > desiredDistanceFromCarAhead * 2.5) && !(Constants.rightLaneEnd - getDistanceFromStart() < 600 && Constants.rightLaneEnd > 0 && this.lane == Constants.lanes)) {
+            if ((frontCar == null || frontCar.getDistanceFromStart() - this.distanceFromStart > desiredDistanceFromCarAhead * 2.5) && !(Constants.rightLaneEnd - getDistanceFromStart() < 600 && Constants.rightLaneEnd > 0 && this.lane == t.getNumLanes())) {
                 return; // No need to change lane, enough space ahead
             }
 
@@ -59,8 +72,10 @@
                 boolean requiredChange = false;
                 int newLane = lane + dir;
                 boolean rightLaneAvailable = Constants.rightLaneEnd < 0 || getDistanceFromStart() < Constants.rightLaneEnd;
-                if (newLane < 1 || newLane > (rightLaneAvailable ? Constants.lanes : Constants.lanes - 1)) {
+                if (newLane < 1 || newLane > (rightLaneAvailable ? t.getNumLanes() : t.getNumLanes() - 1)) {
                     continue;
+                } else{
+                    new String("new lane detected");
                 }
 
                 Car frontInNewLane = findFrontCar(cars, newLane);
@@ -94,7 +109,7 @@
                         }
                     }
                 }
-                if (Constants.rightLaneEnd - getDistanceFromStart() < 600 && Constants.rightLaneEnd > 0 && newLane == Constants.lanes){
+                if (Constants.rightLaneEnd - getDistanceFromStart() < 600 && Constants.rightLaneEnd > 0 && newLane == t.getNumLanes()){
                     laneClear = false;
                 }
 
@@ -116,7 +131,7 @@
                     }
                 }
 
-                if (this.lane == Constants.lanes && Constants.rightLaneEnd > 0 &&
+                if (this.lane == t.getNumLanes() && Constants.rightLaneEnd > 0 &&
                     this.distanceFromStart > Constants.rightLaneEnd - 500) {
                     requiredChange = true;
                 }
@@ -151,7 +166,7 @@
                 targetSpeed = Math.min(maxSpeedMPH, Math.max(0, targetSpeed));
             }
 
-            if (this.lane == Constants.lanes) {
+            if (this.lane == t.getNumLanes()) {
                 double distanceToEnd = Constants.rightLaneEnd - (this.distanceFromStart + this.getLength() / 2);
                 
                 if (distanceToEnd < 700 && Constants.rightLaneEnd > 0) {

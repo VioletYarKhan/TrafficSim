@@ -4,12 +4,15 @@
 package trafficsim;
 
 import java.util.Arrays;
+import java.util.List;
+
+import trafficsim.Constants.ConstantCars;
 
 public class Main {
     public static void main(String[] args) {
         System.out.print("\033[H\033[2J");  
         System.out.flush();  
-        Traffic t = Traffic.startSim(Constants.lanes, Constants.cars, Constants.dt, Constants.simTime);
+        Traffic t = Traffic.startSim(1, List.of(ConstantCars.fastCar, ConstantCars.slowCar), Constants.dt, Constants.simTime, true);
         System.out.println("Average Distance (ft): " + t.getAverageDistance());
         System.out.println("Max Distance (ft): " + t.getMaxDistance());
         System.out.println("Cars per Lane: " + Arrays.toString(t.carsPerLane()));
